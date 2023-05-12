@@ -154,7 +154,7 @@ class MultipleAlignment:
     final_sequences: typing.Optional[typing.List[SequenceBase]] = None
     final_consensus_weights: typing.Optional[typing.List[np.ndarray]] = None
     final_alignments: typing.Optional[typing.Dict[str, typing.Dict[str, np.ndarray]]] = None
-    align_cofactors: bool = False
+    align_cofactors: typing.Bool = False
 
     def make_pairwise_matrix(self, score_function_params=None):
         if score_function_params is None:
@@ -816,7 +816,7 @@ def get_reference_structures(alignment, minimum_coverage=50, gap=-1):
     return names[first_reference_structure], {names[k]: v for k, v in reference_structures.items()}, no_aligning
 
 
-def write_superposed_pdbs_references(input_dir, cleaned_pdb_folder, alignment, output_pdb_folder,
+def write_superposed_pdbs_references(cleaned_pdb_folder, alignment, output_pdb_folder,
                                      minimum_coverage=50, verbose=False):
     """
     Superposes PDBs according to a set of reference structures such that each structure assigned to a particular
@@ -832,10 +832,6 @@ def write_superposed_pdbs_references(input_dir, cleaned_pdb_folder, alignment, o
         minimum % of aligning residues to consider a pair of structures for superposition
     verbose
     """
-    if input_dir:
-        pdb_folder = input_dir
-    else:
-        pdb_folder = cleaned_pdb_folder
     first_reference_structure, reference_structures, no_aligning = get_reference_structures(alignment, minimum_coverage)
     if verbose:
         typer.echo(f"Reference structure(s): " + " ".join(reference_structures.keys()))
@@ -847,7 +843,7 @@ def write_superposed_pdbs_references(input_dir, cleaned_pdb_folder, alignment, o
                         f.write(f"\t{k}")
     reference_pdb = pd.parsePDB(
         str(
-            pdb_folder
+            cleaned_pdb_folder
             / f"{first_reference_structure}"
         )
     )
@@ -860,7 +856,7 @@ def write_superposed_pdbs_references(input_dir, cleaned_pdb_folder, alignment, o
         reference_coords = reference_pdb[helper.get_alpha_indices(reference_pdb)].getCoords().astype(np.float64)
         for name in reference_structures[reference_name]:
             structure = pd.parsePDB(
-                str(pdb_folder / f"{name}")
+                str(cleaned_pdb_folder / f"{name}")
             )
             pdb_coords = structure[helper.get_alpha_indices(structure)].getCoords().astype(np.float64)
             aln_name = alignment[name]
