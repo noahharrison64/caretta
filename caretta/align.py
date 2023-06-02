@@ -3,7 +3,6 @@ from prody import LOGGER
 from functools import partialmethod
 import tqdm
 from functools import partialmethod
-from caretta import multiple_alignment
 import numba as nb
 import MDAnalysis as mda
 from typing import Union, List
@@ -16,12 +15,12 @@ def run_caretta_alignment(
         return_paths: bool,
         verbose: bool = False,
     ) -> Union[List[mda.Universe], List[Path]]:
-        nb.set_num_threads(nthreads)
-        multiple_alignment.trigger_numba_compilation()
-
-        #Silence output
+        
         tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+        from caretta import multiple_alignment
         LOGGER.verbosity = 'warning'
+        nb.set_num_threads(nthreads)
+        multiple_alignment.trigger_numba_compilation()       
 
         output = multiple_alignment.align_from_structure_files(
             input_files=input_files,
