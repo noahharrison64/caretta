@@ -14,6 +14,7 @@ import typer
 from numpy.linalg import LinAlgError
 from tqdm import tqdm
 from geometricus import moment_invariants, Geometricus, ShapemerLearn
+from numba.typed import List
 
 from caretta import (
     dynamic_time_warping as dtw,
@@ -26,6 +27,11 @@ from caretta import (
 
 from abc import ABC, abstractmethod
 
+def to_typed_list(list):
+    typed_list = List()
+    for element in list:
+        typed_list.append(element)
+    return typed_list
 
 def alignment_to_numpy(alignment):
     aln_np = {}
@@ -521,8 +527,8 @@ def align_from_structure_files(
         else:
             shapemer_keys = list(map(tuple, itertools.product([0, 1], repeat=model.output_dimension)))
             shapemers = Geometricus.from_invariants(protein_moments, model=model)
-            proteins_to_shapemer_indices, _ = shapemers.map_protein_to_shapemer_indices(shapemer_keys=shapemer_keys)
-            count_matrix = make_count_matrix([proteins_to_shapemer_indices[m.name] for m in protein_moments],
+            proteins_to_shapemer_indices, _ = shapemers.map_protein_to_shapemer_indices(shapemer_keys=shapemer_keys)           
+            count_matrix = make_count_matrix(to_typed_list([proteins_to_shapemer_indices[m.name] for m in protein_moments]),
                                              len(shapemer_keys))
             pairwise_distance_matrix = braycurtis(count_matrix, count_matrix)
     if write_matrix:
@@ -1109,5 +1115,5 @@ def trigger_numba_compilation():
     helper.get_common_positions(aln_1, aln_2)
     get_mean_weights(coords_1[:, :1], coords_2[:, :1], aln_1, aln_2)
     make_coverage_gap_distance_matrix(np.vstack((aln_1, aln_2)))
-    count_matrix = make_count_matrix([np.random.randint(0, 5, 10) for _ in range(10)], 5)
+    count_matrix = make_count_matrix(to_typed_list([np.random.randint(0, 5, 10) for _ in range(10)]), 5)
     braycurtis(count_matrix, count_matrix)
