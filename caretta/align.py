@@ -1,7 +1,6 @@
     
 from prody import LOGGER
-from functools import partialmethod
-import tqdm
+from caretta import multiple_alignment
 from functools import partialmethod
 import numba as nb
 import MDAnalysis as mda
@@ -16,8 +15,6 @@ def run_caretta_alignment(
         verbose: bool = False,
     ) -> Union[List[mda.Universe], List[Path]]:
         
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-        from caretta import multiple_alignment
         LOGGER.verbosity = 'warning'
         nb.set_num_threads(nthreads)
         multiple_alignment.trigger_numba_compilation()       
@@ -30,13 +27,7 @@ def run_caretta_alignment(
             align_cofactors=True,
             verbose=verbose
                 )
-        
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+        out_files =  [list(output[1].pdb_folder.glob(f'*{in_file.stem}*'))[0] for in_file in input_files]
         if return_paths:
-            return [
-                f for f in output[1].pdb_folder.glob('*.pdb') if f.stem in [in_f.stem for in_f in input_files]
-            ]
-        else:
-            return [
-                mda.Universe(f) for f in output[1].pdb_folder.glob('*.pdb') if f.stem in [in_f.stem for in_f in input_files]
-            ]
+           return out_files
+        return [mda.Universe(out_file) for out_file in out_files]
