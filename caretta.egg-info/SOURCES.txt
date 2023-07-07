@@ -6,6 +6,7 @@ setup.py
 bin/caretta-app
 bin/caretta-cli
 caretta/__init__.py
+caretta/align.py
 caretta/dynamic_time_warping.py
 caretta/feature_extraction.py
 caretta/helper.py

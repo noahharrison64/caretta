@@ -1,4 +1,4 @@
-#!/opt/anaconda3/envs/config_preprocess/bin/python
+#!python
 import warnings
 
 warnings.filterwarnings("ignore")

@@ -1,6 +1,7 @@
     
 from prody import LOGGER
 from caretta import multiple_alignment
+from functools import partialmethod
 import numba as nb
 import MDAnalysis as mda
 from typing import Union, List

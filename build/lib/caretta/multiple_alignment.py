@@ -14,6 +14,7 @@ import typer
 from numpy.linalg import LinAlgError
 from tqdm import tqdm
 from geometricus import moment_invariants, Geometricus, ShapemerLearn
+from numba.typed import List
 
 from caretta import (
     dynamic_time_warping as dtw,
@@ -25,7 +26,15 @@ from caretta import (
 )
 
 from abc import ABC, abstractmethod
+from functools import partialmethod
+tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
+
+def to_typed_list(list):
+    typed_list = List()
+    for element in list:
+        typed_list.append(element)
+    return typed_list
 
 def alignment_to_numpy(alignment):
     aln_np = {}
@@ -154,13 +163,13 @@ class MultipleAlignment:
     final_sequences: typing.Optional[typing.List[SequenceBase]] = None
     final_consensus_weights: typing.Optional[typing.List[np.ndarray]] = None
     final_alignments: typing.Optional[typing.Dict[str, typing.Dict[str, np.ndarray]]] = None
-    align_cofactors: typing.Bool = False
+    align_cofactors: bool = False
 
     def make_pairwise_matrix(self, score_function_params=None):
         if score_function_params is None:
             score_function_params = {}
         pairwise_score_matrix = np.zeros((len(self.sequences), len(self.sequences)))
-        for i in tqdm(range(len(self.sequences) - 1)):
+        for i in range(len(self.sequences) - 1):
             for j in range(i + 1, len(self.sequences)):
                 pairwise_score_matrix[i, j] = pairwise_score_matrix[j, i] = dtw.smith_waterman_score(
                     np.arange(len(self.sequences[i])),
@@ -234,7 +243,7 @@ class MultipleAlignment:
             )
             final_consensus_weights.append(intermediate_weights)
 
-        for x in tqdm(range(0, tree.shape[0] - 1, 2), desc="Aligning"):
+        for x in range(0, tree.shape[0] - 1, 2):
             node_1, node_2, node_int = (
                 tree[x, 0],
                 tree[x + 1, 0],
@@ -521,8 +530,8 @@ def align_from_structure_files(
         else:
             shapemer_keys = list(map(tuple, itertools.product([0, 1], repeat=model.output_dimension)))
             shapemers = Geometricus.from_invariants(protein_moments, model=model)
-            proteins_to_shapemer_indices, _ = shapemers.map_protein_to_shapemer_indices(shapemer_keys=shapemer_keys)
-            count_matrix = make_count_matrix([proteins_to_shapemer_indices[m.name] for m in protein_moments],
+            proteins_to_shapemer_indices, _ = shapemers.map_protein_to_shapemer_indices(shapemer_keys=shapemer_keys)           
+            count_matrix = make_count_matrix(to_typed_list([proteins_to_shapemer_indices[m.name] for m in protein_moments]),
                                              len(shapemer_keys))
             pairwise_distance_matrix = braycurtis(count_matrix, count_matrix)
     if write_matrix:
@@ -816,7 +825,7 @@ def get_reference_structures(alignment, minimum_coverage=50, gap=-1):
     return names[first_reference_structure], {names[k]: v for k, v in reference_structures.items()}, no_aligning
 
 
-def write_superposed_pdbs_references(cleaned_pdb_folder, alignment, output_pdb_folder,
+def write_superposed_pdbs_references(input_dir, cleaned_pdb_folder, alignment, output_pdb_folder,
                                      minimum_coverage=50, verbose=False):
     """
     Superposes PDBs according to a set of reference structures such that each structure assigned to a particular
@@ -832,6 +841,10 @@ def write_superposed_pdbs_references(cleaned_pdb_folder, alignment, output_pdb_f
         minimum % of aligning residues to consider a pair of structures for superposition
     verbose
     """
+    if input_dir:
+        pdb_folder = input_dir
+    else:
+        pdb_folder = cleaned_pdb_folder
     first_reference_structure, reference_structures, no_aligning = get_reference_structures(alignment, minimum_coverage)
     if verbose:
         typer.echo(f"Reference structure(s): " + " ".join(reference_structures.keys()))
@@ -843,7 +856,7 @@ def write_superposed_pdbs_references(cleaned_pdb_folder, alignment, output_pdb_f
                         f.write(f"\t{k}")
     reference_pdb = pd.parsePDB(
         str(
-            cleaned_pdb_folder
+            pdb_folder
             / f"{first_reference_structure}"
         )
     )
@@ -856,7 +869,7 @@ def write_superposed_pdbs_references(cleaned_pdb_folder, alignment, output_pdb_f
         reference_coords = reference_pdb[helper.get_alpha_indices(reference_pdb)].getCoords().astype(np.float64)
         for name in reference_structures[reference_name]:
             structure = pd.parsePDB(
-                str(cleaned_pdb_folder / f"{name}")
+                str(pdb_folder / f"{name}")
             )
             pdb_coords = structure[helper.get_alpha_indices(structure)].getCoords().astype(np.float64)
             aln_name = alignment[name]
@@ -962,7 +975,7 @@ def superpose_core(alignment, proteins, reference_name, core_indices: np.ndarray
     ]
     ref_centroid = helper.nb_mean_axis_0(ref_coords)
     ref_coords -= ref_centroid
-    for i in tqdm(range(len(proteins))):
+    for i in range(len(proteins)):
         if i == reference_structure_index:
             proteins[i].coordinates -= ref_centroid
         else:
@@ -1058,7 +1071,7 @@ def make_rmsd_coverage_tm_matrix(
     if superpose_first:
         proteins = superpose(alignment, proteins)
     names = [p.name for p in proteins]
-    for i in tqdm(range(num - 1)):
+    for i in range(num - 1):
         for j in range(i + 1, num):
             name_1, name_2 = names[i], names[j]
             aln_1 = alignment[name_1]
@@ -1105,5 +1118,5 @@ def trigger_numba_compilation():
     helper.get_common_positions(aln_1, aln_2)
     get_mean_weights(coords_1[:, :1], coords_2[:, :1], aln_1, aln_2)
     make_coverage_gap_distance_matrix(np.vstack((aln_1, aln_2)))
-    count_matrix = make_count_matrix([np.random.randint(0, 5, 10) for _ in range(10)], 5)
+    count_matrix = make_count_matrix(to_typed_list([np.random.randint(0, 5, 10) for _ in range(10)]), 5)
     braycurtis(count_matrix, count_matrix)
